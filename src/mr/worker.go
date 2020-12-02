@@ -41,7 +41,7 @@ func Worker(mapf func(string, string) []KeyValue,
 	// uncomment to send the Example RPC to the master.
 	// CallExample()
 	
-	for i := 0; i < 3; i++{
+	for i := 0; i < 10; i++{
 		// Asking for a task
 		args := AssignTaskArgs{}
 		reply := AssignTaskReply{}
@@ -100,9 +100,10 @@ func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) 
 		interSplit[i] = append(interSplit[i], kv)	
 	}
 	for i := 0; i < nReduce; i++ {
-		file, err = os.Create(fmt.Sprintf("mr-%d-%d", os.Getpid(), i))
+		newFileName := fmt.Sprintf("mr-%s-%d", fileName[6:10], i)
+		file, err = os.Create(newFileName)
 		if err != nil {
-			log.Fatalf("Can not create file %s because %e", fmt.Sprintf("mr-%d-%d", os.Getpid(), i), err)
+			log.Fatalf("Can not create file %s because %e", newFileName, err)
 		}
 		enc := json.NewEncoder(file)
 		for _, kv := range interSplit[i] {
