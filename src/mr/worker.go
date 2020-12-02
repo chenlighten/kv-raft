@@ -48,11 +48,12 @@ func Worker(mapf func(string, string) []KeyValue,
 		args.WorkerPid = os.Getpid()
 		log.Printf("Worker %d asking for a task", args.WorkerPid)
 		call("Master.AssignTask", &args, &reply)
-		log.Printf("Worker %d recieving %s task %s", args.WorkerPid, reply.TaskType, reply.TaskName)
+		log.Printf("Worker %d recieving %s task %s, with nReduce=%v", 
+			args.WorkerPid, reply.TaskType, reply.TaskName, reply.TaskNReduce)
 		
 		// Handle that task
 		if reply.TaskType == "map" {
-			
+			doMap(mapf, reply.TaskName, reply.TaskNReduce)
 		}
 	}
 }
@@ -69,6 +70,7 @@ func CallExample() {
 
 	// fill in the argument(s).
 	args.X = 99
+	args.B = 99
 
 	// declare a reply structure.
 	reply := ExampleReply{}
@@ -77,7 +79,7 @@ func CallExample() {
 	call("Master.Example", &args, &reply)
 
 	// reply.Y should be 100.
-	fmt.Printf("reply.Y %v\n", reply.Y)
+	fmt.Printf("reply.Y %v\nreply.C %v", reply.Y, reply.C)
 }
 
 func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) {
@@ -87,7 +89,7 @@ func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) 
 	}
 	content, err := ioutil.ReadAll(file)
 	if err != nil {
-		log.Fatal("Can not read file %s because %e", fileName, err)
+		log.Fatalf("Can not read file %s because %e", fileName, err)
 	}
 	file.Close()
 
@@ -103,9 +105,11 @@ func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) 
 			log.Fatalf("Can not create file %s because %e", fmt.Sprintf("mr-%d-%d", os.Getpid(), i), err)
 		}
 		enc := json.NewEncoder(file)
-		
+		for _, kv := range interSplit[i] {
+			enc.Encode(kv)
+		}
+		file.Close()
 	}
-	
 }
 
 //

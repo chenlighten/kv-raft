@@ -16,10 +16,12 @@ import "strconv"
 
 type ExampleArgs struct {
 	X int
+	B int
 }
 
 type ExampleReply struct {
 	Y int
+	C int
 }
 
 // Add your RPC definitions here.
@@ -31,7 +33,7 @@ type AssignTaskArgs struct {
 type AssignTaskReply struct {
 	TaskType string		// "map", "reduce", "wait", "exit"
 	TaskName string
-	nReduce int
+	TaskNReduce int
 }
 
 // Cook up a unique-ish UNIX-domain socket name

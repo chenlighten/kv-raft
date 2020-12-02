@@ -47,7 +47,8 @@ const (
 // the RPC argument and reply types are defined in rpc.go.
 //
 func (m *Master) Example(args *ExampleArgs, reply *ExampleReply) error {
-	reply.Y = args.X + 1
+	reply.Y = args.X + args.B
+	reply.C = args.X*2
 	return nil
 }
 
@@ -55,7 +56,8 @@ func (m *Master) AssignTask(args *AssignTaskArgs, reply *AssignTaskReply) error 
 	workerPid := args.WorkerPid
 	m.bigLock.Lock()
 	defer m.bigLock.Unlock()
-	reply.nReduce = m.nReduce
+	reply.TaskNReduce = m.nReduce
+	
 	// Map tasks not finished
 	if m.nMapRemain != 0 {
 		// Find an unassigned map task
