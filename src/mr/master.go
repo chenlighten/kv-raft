@@ -55,6 +55,7 @@ func (m *Master) AssignTask(args *AssignTaskArgs, reply *AssignTaskReply) error 
 	workerPid := args.WorkerPid
 	m.bigLock.Lock()
 	defer m.bigLock.Unlock()
+	reply.nReduce = m.nReduce
 	// Map tasks not finished
 	if m.nMapRemain != 0 {
 		// Find an unassigned map task

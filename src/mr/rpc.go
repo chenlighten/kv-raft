@@ -31,6 +31,7 @@ type AssignTaskArgs struct {
 type AssignTaskReply struct {
 	TaskType string		// "map", "reduce", "wait", "exit"
 	TaskName string
+	nReduce int
 }
 
 // Cook up a unique-ish UNIX-domain socket name
