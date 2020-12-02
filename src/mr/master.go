@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"errors"
 	"log"
 	"net"
 	"net/http"
@@ -57,7 +58,7 @@ func (m *Master) AssignTask(args *AssignTaskArgs, reply *AssignTaskReply) error 
 	m.bigLock.Lock()
 	defer m.bigLock.Unlock()
 	reply.TaskNReduce = m.nReduce
-	
+
 	// Map tasks not finished
 	if m.nMapRemain != 0 {
 		// Find an unassigned map task
@@ -101,6 +102,43 @@ func (m *Master) AssignTask(args *AssignTaskArgs, reply *AssignTaskReply) error 
 		m.workerStates[workerPid] = WorkerState_Idle
 		return nil
 	}
+}
+
+func (m *Master) ReportTaskComplete(args *ReportTaskCompleteArgs, reply *ReportTaskCompleteReply) error {
+	// workerPid := args.WorkerPid
+	taskType := args.TaskType
+	taskName := args.TaskName
+	m.bigLock.Lock()
+	defer m.bigLock.Unlock()
+	if taskType == "map" {
+		state, exists := m.mapTaskStates[taskName]
+		if !exists {
+			reply.msg = "Report map task that doesn't exist."
+		} else if state == TaskState_Running {
+			reply.msg = "Report map task success."
+			m.mapTaskStates[taskName] = TaskState_Completed
+			m.nMapRemain--
+		} else if state == TaskState_Unassigned {
+			reply.msg = "Report unassigned map task."
+		} else if state == TaskState_Completed {
+			reply.msg = "Report map task that already completed."
+		}
+	} else if taskType == "reduce" {
+		taskId, _ := strconv.Atoi(taskName)
+		state, exists := m.reduceTaskStates[taskId]
+		if !exists {
+			reply.msg = "Report reduce task that doesn't exist."
+		} else if state == TaskState_Running {
+			reply.msg = "Report reduce task success."
+			m.reduceTaskStates[taskId] = TaskState_Completed
+			m.nReduceRemain--
+		} else if state == TaskState_Unassigned {
+			reply.msg = "Report unassigned reduce task."
+		} else if state == TaskState_Completed {
+			reply.msg = "Report reduce task that already completed."
+		}
+	}
+	return nil
 }
 
 //

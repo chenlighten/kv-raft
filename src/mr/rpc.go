@@ -36,6 +36,15 @@ type AssignTaskReply struct {
 	TaskNReduce int
 }
 
+type ReportTaskCompleteArgs struct {
+	WorkerPid int
+	TaskType string
+	TaskName string
+}
+
+type ReportTaskCompleteReply struct {
+}
+
 // Cook up a unique-ish UNIX-domain socket name
 // in /var/tmp, for the master.
 // Can't use the current directory since
