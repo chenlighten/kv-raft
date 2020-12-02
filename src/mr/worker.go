@@ -1,8 +1,10 @@
 package mr
 
 import (
+	"encoding/json"
 	"fmt"
 	"hash/fnv"
+	"io/ioutil"
 	"log"
 	"net/rpc"
 	"os"
@@ -78,7 +80,31 @@ func CallExample() {
 	fmt.Printf("reply.Y %v\n", reply.Y)
 }
 
-func doMap(mapf func (string, string) []KeyValue, fileName string) {
+func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) {
+	file, err := os.Open(fileName)
+	if err != nil {
+		log.Fatalf("Can not open file %s because %e", fileName, err)
+	}
+	content, err := ioutil.ReadAll(file)
+	if err != nil {
+		log.Fatal("Can not read file %s because %e", fileName, err)
+	}
+	file.Close()
+
+	intermidiate := mapf(fileName, string(content))
+	interSplit := make([][]KeyValue, nReduce)
+	for _, kv := range intermidiate {
+		i := ihash(kv.Key) % nReduce
+		interSplit[i] = append(interSplit[i], kv)	
+	}
+	for i := 0; i < nReduce; i++ {
+		file, err = os.Create(fmt.Sprintf("mr-%d-%d", os.Getpid(), i))
+		if err != nil {
+			log.Fatalf("Can not create file %s because %e", fmt.Sprintf("mr-%d-%d", os.Getpid(), i), err)
+		}
+		enc := json.NewEncoder(file)
+		
+	}
 	
 }
 
