@@ -43,6 +43,7 @@ type ReportTaskCompleteArgs struct {
 }
 
 type ReportTaskCompleteReply struct {
+	Msg string
 }
 
 // Cook up a unique-ish UNIX-domain socket name

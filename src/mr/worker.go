@@ -50,10 +50,19 @@ func Worker(mapf func(string, string) []KeyValue,
 		call("Master.AssignTask", &args, &reply)
 		log.Printf("Worker %d recieving %s task %s, with nReduce=%v", 
 			args.WorkerPid, reply.TaskType, reply.TaskName, reply.TaskNReduce)
-		
+
 		// Handle that task
 		if reply.TaskType == "map" {
 			doMap(mapf, reply.TaskName, reply.TaskNReduce)
+			args := ReportTaskCompleteArgs{}
+			args.WorkerPid = os.Getpid()
+			args.TaskType = "map"
+			reply := ReportTaskCompleteReply{}
+			log.Printf("Worker %d report map task %s completed.", args.WorkerPid, args.TaskName)
+			call("Master.ReportTaskComplete", &args, &reply)
+			log.Printf("Worker %d get reporting feedback: %s", args.WorkerPid, reply.Msg)
+		} else if reply.TaskType == "reduce" {
+
 		}
 	}
 }
@@ -111,6 +120,10 @@ func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) 
 		}
 		file.Close()
 	}
+}
+
+func doReduce(reducef func(string, []string) string, ) {
+
 }
 
 //
