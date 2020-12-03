@@ -8,6 +8,9 @@ import (
 	"log"
 	"net/rpc"
 	"os"
+	"sort"
+	"strconv"
+	"strings"
 )
 
 //
@@ -17,6 +20,14 @@ type KeyValue struct {
 	Key   string
 	Value string
 }
+
+// for sorting by key.
+type ByKey []KeyValue
+
+// for sorting by key.
+func (a ByKey) Len() int           { return len(a) }
+func (a ByKey) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByKey) Less(i, j int) bool { return a[i].Key < a[j].Key }
 
 //
 // use ihash(key) % NReduce to choose the reduce
@@ -52,17 +63,28 @@ func Worker(mapf func(string, string) []KeyValue,
 			args.WorkerPid, reply.TaskType, reply.TaskName, reply.TaskNReduce)
 
 		// Handle that task
-		if reply.TaskType == "map" {
-			doMap(mapf, reply.TaskName, reply.TaskNReduce)
+		taskName := reply.TaskName
+		taskType := reply.TaskType
+		nReduce := reply.TaskNReduce
+		if taskType == "map" {
+			doMap(mapf, taskName, nReduce)
 			args := ReportTaskCompleteArgs{}
 			args.WorkerPid = os.Getpid()
 			args.TaskType = "map"
+			args.TaskName = taskName
 			reply := ReportTaskCompleteReply{}
 			log.Printf("Worker %d report map task %s completed.", args.WorkerPid, args.TaskName)
 			call("Master.ReportTaskComplete", &args, &reply)
 			log.Printf("Worker %d get reporting feedback: %s", args.WorkerPid, reply.Msg)
-		} else if reply.TaskType == "reduce" {
-
+		} else if taskType == "reduce" {
+			log.Printf("Begin a reduce task")
+			taskId, _ := strconv.Atoi(taskName)
+			doReduce(reducef, taskId, nReduce)
+			args := ReportTaskCompleteArgs{}
+			args.WorkerPid = os.Getpid()
+			args.TaskType = "reduce"
+			//reply := ReportTaskCompleteReply{}
+			log.Printf("Worker %d report reduce task %s completed.", args.WorkerPid, taskName)
 		}
 	}
 }
@@ -122,8 +144,60 @@ func doMap(mapf func (string, string) []KeyValue, fileName string, nReduce int) 
 	}
 }
 
-func doReduce(reducef func(string, []string) string, ) {
-
+func doReduce(reducef func(string, []string) string, taskId int, nReduce int) {
+	intermidiate := []KeyValue{}
+	log.Printf("Begin reading files...")
+	allFiles, err := ioutil.ReadDir("./")
+	if err != nil {
+		log.Fatalf("Error reading working directory")
+	}
+	fileNames := []string{}
+	for _, file := range allFiles {
+		splitFileName := strings.Split(file.Name(), "-")
+		if id, _ := strconv.Atoi(splitFileName[len(splitFileName) - 1]); id == taskId {
+			fileNames = append(fileNames, file.Name())
+		}
+	}
+	for _, fileName := range fileNames {
+		file, err := os.Open(fileName)
+		if err != nil {
+			log.Fatalf("Can not open file %s in reduce task", fileName)
+		}
+		dec := json.NewDecoder(file)
+		for {
+			var kv KeyValue
+			if err := dec.Decode(&kv); err != nil {
+				break
+			}
+			intermidiate = append(intermidiate, kv)
+		}
+	}
+	log.Printf("Reading files done, size %d", len(intermidiate))
+	log.Printf("Begin sorting...")
+	sort.Sort(ByKey(intermidiate))
+	log.Printf("Sorting done")
+	log.Printf("Begin doing reduce...")
+	results := []KeyValue{}
+	for i, j := 0, 0; j < len(intermidiate); {
+		values := []string{}
+		for ; j < len(intermidiate) && intermidiate[i].Key == intermidiate[j].Key; j++ {
+			values = append(values, intermidiate[j].Value)
+		}
+		results = append(results, KeyValue{intermidiate[i].Key, reducef(intermidiate[i].Key, values)})
+		i = j
+	}
+	log.Printf("Doing reduce done")
+	
+	log.Printf("Begin writing result")
+	file, err := os.Create(fmt.Sprintf("mr-out-%d", taskId))
+	if err != nil {
+		log.Fatalf("Can not create file %s", fmt.Sprintf("mr-out-%d", taskId))
+	}
+	for _, kv := range results {
+		fmt.Fprintf(file, "%v %v\n", kv.Key, kv.Value)
+	}
+	file.Close()
+	log.Printf("Writing result done")
 }
 
 //

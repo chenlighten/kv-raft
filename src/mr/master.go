@@ -189,6 +189,7 @@ func MakeMaster(files []string, nReduce int) *Master {
 	m.nReduce = nReduce
 	m.nMap = len(files)
 	m.nMapRemain = m.nMap
+	m.nReduceRemain = nReduce
 	copy(files, m.mapTasks)
 	m.mapTaskStates = make(map[string]TaskStateType)
 	m.reduceTaskStates = make(map[int]TaskStateType)
