@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //
@@ -52,7 +53,7 @@ func Worker(mapf func(string, string) []KeyValue,
 	// uncomment to send the Example RPC to the master.
 	// CallExample()
 	
-	for i := 0; i < 10; i++{
+	for i := 0; i < 100; i++{
 		// Asking for a task
 		args := AssignTaskArgs{}
 		reply := AssignTaskReply{}
@@ -85,6 +86,10 @@ func Worker(mapf func(string, string) []KeyValue,
 			args.TaskType = "reduce"
 			//reply := ReportTaskCompleteReply{}
 			log.Printf("Worker %d report reduce task %s completed.", args.WorkerPid, taskName)
+		} else if taskType == "wait" {
+			time.Sleep(time.Millisecond)
+		} else if taskType == "exit" {
+			break
 		}
 	}
 }
