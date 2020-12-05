@@ -59,7 +59,10 @@ func Worker(mapf func(string, string) []KeyValue,
 		reply := AssignTaskReply{}
 		args.WorkerPid = os.Getpid()
 		log.Printf("Worker %d asking for a task", args.WorkerPid)
-		call("Master.AssignTask", &args, &reply)
+		if !call("Master.AssignTask", &args, &reply) {
+			log.Printf("Lost connection to master.")
+			return
+		}
 		log.Printf("Worker %d recieving %s task %s, with nReduce=%v", 
 			args.WorkerPid, reply.TaskType, reply.TaskName, reply.TaskNReduce)
 
