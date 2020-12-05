@@ -84,11 +84,16 @@ func Worker(mapf func(string, string) []KeyValue,
 			args := ReportTaskCompleteArgs{}
 			args.WorkerPid = os.Getpid()
 			args.TaskType = "reduce"
-			//reply := ReportTaskCompleteReply{}
-			log.Printf("Worker %d report reduce task %s completed.", args.WorkerPid, taskName)
+			args.TaskName = taskName
+			reply := ReportTaskCompleteReply{}
+			log.Printf("Worker %d report reduce task %s completed.", args.WorkerPid, args.TaskName)
+			call("Master.ReportTaskComplete", &args, &reply)
+			log.Printf("Worker %d get reporting feedback: %s", args.WorkerPid, reply.Msg)
 		} else if taskType == "wait" {
+			log.Printf("Worker %d get waiting task.", os.Getpid())
 			time.Sleep(time.Millisecond)
 		} else if taskType == "exit" {
+			log.Printf("Worker %d get exiting task.", os.Getpid())
 			break
 		}
 	}
