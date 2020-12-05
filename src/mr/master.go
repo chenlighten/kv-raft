@@ -168,7 +168,9 @@ func (m *Master) server() {
 //
 func (m *Master) Done() bool {
 	ret := false
-
+	if m.nReduceRemain == 0 {
+		ret = true
+	}
 	// Your code here.
 
 	return ret
