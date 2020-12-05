@@ -9,6 +9,8 @@ RACE=
 # uncomment this to run the tests with the Go race detector.
 #RACE=-race
 
+go env -w GO111MODULE=off
+
 # run the test in a fresh sub-directory.
 rm -rf mr-tmp
 mkdir mr-tmp || exit 1
@@ -208,3 +210,5 @@ else
     echo '***' FAILED SOME TESTS
     exit 1
 fi
+
+go env -w GO111MODULE=auto
