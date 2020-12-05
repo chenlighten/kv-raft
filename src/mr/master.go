@@ -1,6 +1,7 @@
 package mr
 
 import (
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -186,6 +187,8 @@ func MakeMaster(files []string, nReduce int) *Master {
 
 	// Your code here.
 	log.SetFlags(log.Lmicroseconds)
+	logFile, _ := os.Create(fmt.Sprintf("Master-%d.log", os.Getpid()))
+	log.SetOutput(logFile)
 	
 	m.bigLock.Lock()
 	m.nReduce = nReduce

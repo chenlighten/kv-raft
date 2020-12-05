@@ -49,6 +49,8 @@ func Worker(mapf func(string, string) []KeyValue,
 	// Your worker implementation here.
 
 	log.SetFlags(log.Lmicroseconds)
+	logFile, _ := os.Create(fmt.Sprintf("Worker-%d.log", os.Getpid()))
+	log.SetOutput(logFile)
 
 	// uncomment to send the Example RPC to the master.
 	// CallExample()
