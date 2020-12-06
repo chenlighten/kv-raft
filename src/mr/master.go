@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"sync"
+	"time"
 )
 
 type Master struct {
@@ -24,6 +25,10 @@ type Master struct {
 	reduceTaskStates map[int]TaskStateType
 	workerStates map[int]WorkerStateType
 	bigLock sync.Mutex
+
+	// for crash checking
+	mapTaskBeginTime map[string]time.Time
+	reduceTaskBeginTime map[int]time.Time
 }
 
 type TaskStateType int32
@@ -69,6 +74,7 @@ func (m *Master) AssignTask(args *AssignTaskArgs, reply *AssignTaskReply) error 
 				reply.TaskType = "map"
 				m.mapTaskStates[task] = TaskState_Running
 				m.workerStates[workerPid] = WorkerState_Runing
+				m.mapTaskBeginTime[task] = time.Now()
 				return nil
 			}
 		}
@@ -87,6 +93,7 @@ func (m *Master) AssignTask(args *AssignTaskArgs, reply *AssignTaskReply) error 
 				reply.TaskType = "reduce"
 				m.reduceTaskStates[task] = TaskState_Running
 				m.workerStates[workerPid] = WorkerState_Runing
+				m.reduceTaskBeginTime[task] = time.Now()
 				return nil
 			}
 		}
@@ -147,6 +154,27 @@ func (m *Master) ReportTaskComplete(args *ReportTaskCompleteArgs, reply *ReportT
 	return nil
 }
 
+func (m *Master) checkCrash() {
+	for {
+		log.Printf("Crash checking...")
+		m.bigLock.Lock()
+		for task, taskState := range m.mapTaskStates {
+			if taskState == TaskState_Running && time.Since(m.mapTaskBeginTime[task]) > time.Second {
+				log.Printf("Find map task %s overtime", task)
+				m.mapTaskStates[task] = TaskState_Unassigned
+			}
+		}
+		for task, taskState := range m.reduceTaskStates {
+			if taskState == TaskState_Running && time.Since(m.reduceTaskBeginTime[task]) > time.Second {
+				log.Printf("Find reduce task %d overtime", task)
+				m.reduceTaskStates[task] = TaskState_Unassigned
+			}
+		}
+		m.bigLock.Unlock()
+		time.Sleep(time.Second)
+	}
+}
+
 //
 // start a thread that listens for RPCs from worker.go
 //
@@ -199,6 +227,8 @@ func MakeMaster(files []string, nReduce int) *Master {
 	m.mapTaskStates = make(map[string]TaskStateType)
 	m.reduceTaskStates = make(map[int]TaskStateType)
 	m.workerStates = make(map[int]WorkerStateType)
+	m.mapTaskBeginTime = make(map[string]time.Time)
+	m.reduceTaskBeginTime = make(map[int]time.Time)
 	for _, task := range files {
 		m.mapTaskStates[task] = TaskState_Unassigned
 	}
@@ -206,6 +236,8 @@ func MakeMaster(files []string, nReduce int) *Master {
 		m.reduceTaskStates[i] = TaskState_Unassigned
 	}
 	m.bigLock.Unlock()
+
+	go m.checkCrash()
 	
 	m.server()
 	return &m
