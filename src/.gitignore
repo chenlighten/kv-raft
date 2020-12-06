@@ -8,3 +8,6 @@ mrtmp.*
 *.so
 mr-tmp
 run.sh
+mrmaster
+mrsequential
+mrworker
