@@ -171,7 +171,7 @@ func (m *Master) checkCrash() {
 			}
 		}
 		m.bigLock.Unlock()
-		time.Sleep(time.Second)
+		time.Sleep(10*time.Second)
 	}
 }
 
