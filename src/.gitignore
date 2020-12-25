@@ -11,3 +11,4 @@ run.sh
 mrmaster
 mrsequential
 mrworker
+test-raft.sh
