@@ -17,14 +17,16 @@ package raft
 //   in the same server.
 //
 
-import "sync"
-import "sync/atomic"
-import "6.824/src/labrpc"
+import (
+	"log"
+	"sync"
+	"sync/atomic"
+
+	"6.824/src/labrpc"
+)
 
 // import "bytes"
 // import "../labgob"
-
-
 
 //
 // as each Raft peer becomes aware that successive log entries are
@@ -56,7 +58,13 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
-
+	currentTerm 	int
+	votedFor 		int
+	log				[]interface{}
+	commandIndex	int
+	lastApplied		int
+	nextIndex		[]int
+	matchIndex		[]int
 }
 
 // return currentTerm and whether this server
@@ -234,7 +242,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.me = me
 
 	// Your initialization code here (2A, 2B, 2C).
-
+	rf.currentTerm = 0
+	rf.votedFor = -1
+	rf.log = []interface{}{}
+	rf.commandIndex = 0
+	rf.lastApplied = 0
+	
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
