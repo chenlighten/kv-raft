@@ -18,9 +18,10 @@ package raft
 //
 
 import (
-	"log"
+	"math/rand"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"6.824/src/labrpc"
 )
@@ -45,6 +46,13 @@ type ApplyMsg struct {
 	CommandIndex int
 }
 
+type ServerIdentityType int
+const (
+	ServerIdentityType_Leader ServerIdentityType = 0
+	ServerIdentityType_Follower ServerIdentityType = 1
+	ServerIdentityType_Candidate ServerIdentityType = 2
+)
+
 //
 // A Go object implementing a single Raft peer.
 //
@@ -58,6 +66,8 @@ type Raft struct {
 	// Your data here (2A, 2B, 2C).
 	// Look at the paper's Figure 2 for a description of what
 	// state a Raft server must maintain.
+
+	// Fields described in raft paper
 	currentTerm 	int
 	votedFor 		int
 	log				[]interface{}
@@ -65,6 +75,10 @@ type Raft struct {
 	lastApplied		int
 	nextIndex		[]int
 	matchIndex		[]int
+
+	// Some more fields for implementation
+	recievedAppendEntries	bool
+	serverIdentity			ServerIdentityType
 }
 
 // return currentTerm and whether this server
@@ -223,6 +237,51 @@ func (rf *Raft) killed() bool {
 	return z == 1
 }
 
+// This is a little different from the discription in paper.
+func (rf *Raft) kickOffElection() {
+	for {
+		time.Sleep(time.Duration(500 + rand.Intn(100)) * time.Microsecond)
+		if rf.killed() { return }
+		rf.mu.Lock()
+		identity := rf.serverIdentity
+		recieved := rf.recievedAppendEntries
+		rf.mu.Unlock()
+		if !recieved && identity == ServerIdentityType_Follower {
+			go rf.raiseElection()
+		}
+	}
+}
+
+func (rf *Raft) raiseElection() {
+	count := 0
+	finished := 0
+	c := make(chan bool)
+	for i := 0; i < len(rf.peers); i++ {
+		go func(x int) {
+			args := RequestVoteArgs{}
+			reply := RequestVoteReply{}
+			ok := rf.sendRequestVote(x, &args, &reply)
+			if ok /* and reply ensures a vote */ {
+				c <- true
+			} else {
+				c <- false
+			}
+		}(i)
+	}
+
+	for {
+		vote := <-c
+		if vote { count++ }
+		finished++
+		if count > len(rf.peers)/2 || finished > len(rf.peers) { break }
+	}
+
+	// Elected
+	if count > len(rf.peers)/2 {
+	
+	}
+}
+
 //
 // the service or tester wants to create a Raft server. the ports
 // of all the Raft servers (including this one) are in peers[]. this
@@ -247,6 +306,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.log = []interface{}{}
 	rf.commandIndex = 0
 	rf.lastApplied = 0
+	rf.recievedAppendEntries = false
 	
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
