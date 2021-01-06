@@ -156,6 +156,20 @@ type RequestVoteReply struct {
 }
 
 type AppendEntriesArgs struct {
+	Term			int
+	LeaderId		int
+	PrevLogIndex	int
+	PrevLogTerm		int
+	Entries			[]interface{}
+	LeaderCommit	int
+}
+
+type AppendEntriesReply	struct {
+	Term	int
+	success	bool
+}
+
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
 	
 }
 
