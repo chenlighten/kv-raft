@@ -139,6 +139,10 @@ func (rf *Raft) readPersist(data []byte) {
 //
 type RequestVoteArgs struct {
 	// Your data here (2A, 2B).
+	Term			int
+	CandidateId		int
+	LastLogIndex	int
+	LastLogTerm		int
 }
 
 //
@@ -147,6 +151,12 @@ type RequestVoteArgs struct {
 //
 type RequestVoteReply struct {
 	// Your data here (2A).
+	Term		int
+	VoteGranted	bool
+}
+
+type AppendEntriesArgs struct {
+	
 }
 
 //
@@ -253,6 +263,11 @@ func (rf *Raft) kickOffElection() {
 }
 
 func (rf *Raft) raiseElection() {
+	rf.mu.Lock()
+	rf.currentTerm++
+	rf.serverIdentity = ServerIdentityType_Candidate
+	rf.mu.Unlock()
+
 	count := 0
 	finished := 0
 	c := make(chan bool)
@@ -260,12 +275,25 @@ func (rf *Raft) raiseElection() {
 		go func(x int) {
 			args := RequestVoteArgs{}
 			reply := RequestVoteReply{}
+
+			rf.mu.Lock()
+			args.CandidateId = rf.me
+			// Needs to be modified later.
+			// args.LastLogIndex = -1
+			// args.LastLogTerm = -1
+			args.Term = rf.currentTerm
+			rf.mu.Unlock()
+
 			ok := rf.sendRequestVote(x, &args, &reply)
-			if ok /* and reply ensures a vote */ {
-				c <- true
-			} else {
-				c <- false
-			}
+			if ok {
+				if reply.VoteGranted { c <- true } else { c <- false }
+				if reply.Term > rf.currentTerm {
+					rf.mu.Lock()
+					rf.currentTerm = reply.Term
+					rf.serverIdentity = ServerIdentityType_Follower
+					rf.mu.Unlock()
+				}
+			} else { c <- false }
 		}(i)
 	}
 
@@ -277,8 +305,10 @@ func (rf *Raft) raiseElection() {
 	}
 
 	// Elected
-	if count > len(rf.peers)/2 {
-	
+	if count > len(rf.peers)/2 && rf.serverIdentity == ServerIdentityType_Candidate {
+		rf.mu.Lock()
+		rf.serverIdentity = ServerIdentityType_Leader
+
 	}
 }
 
