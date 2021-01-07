@@ -293,7 +293,7 @@ func (rf *Raft) killed() bool {
 // This is a little different from the discription in paper.
 func (rf *Raft) kickOffElection() {
 	for {
-		time.Sleep(time.Duration(500 + rand.Intn(100)) * time.Millisecond)
+		time.Sleep(time.Duration(rand.Intn(100)) * time.Millisecond)
 		if rf.killed() { return }
 		rf.mu.Lock()
 		identity := rf.serverIdentity
@@ -303,6 +303,7 @@ func (rf *Raft) kickOffElection() {
 		if !recieved && identity == ServerIdentityType_Follower {
 			go rf.raiseElection()
 		}
+		time.Sleep(500 * time.Millisecond)
 	}
 }
 
