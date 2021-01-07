@@ -71,7 +71,7 @@ type Raft struct {
 	currentTerm 	int
 	votedFor 		int
 	log				[]interface{}
-	commandIndex	int
+	commitIndex		int
 	lastApplied		int
 	nextIndex		[]int
 	matchIndex		[]int
@@ -169,15 +169,25 @@ type AppendEntriesReply	struct {
 	success	bool
 }
 
-func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
-	
-}
-
 //
 // example RequestVote RPC handler.
 //
 func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	// Your code here (2A, 2B).
+	rf.mu.Lock()
+	defer rf.mu.Unlock()
+	reply.Term = rf.currentTerm
+	if (rf.votedFor == -1 || rf.votedFor == args.CandidateId) && 
+		args.Term >= rf.currentTerm {
+		rf.votedFor = args.CandidateId
+		reply.VoteGranted = true
+	} else {
+		reply.VoteGranted = false
+	}
+}
+
+func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
+	
 }
 
 //
@@ -214,6 +224,10 @@ func (rf *Raft) sendRequestVote(server int, args *RequestVoteArgs, reply *Reques
 	return ok
 }
 
+func (rf *Raft) sendAppendEntries(server int, args *AppendEntriesArgs, reply *AppendEntriesReply) bool {
+	ok := rf.peers[server].Call("Raft.AppendEntries", args, reply)
+	return ok
+}
 
 //
 // the service using Raft (e.g. a k/v server) wants to start
@@ -264,7 +278,7 @@ func (rf *Raft) killed() bool {
 // This is a little different from the discription in paper.
 func (rf *Raft) kickOffElection() {
 	for {
-		time.Sleep(time.Duration(500 + rand.Intn(100)) * time.Microsecond)
+		time.Sleep(time.Duration(500 + rand.Intn(100)) * time.Millisecond)
 		if rf.killed() { return }
 		rf.mu.Lock()
 		identity := rf.serverIdentity
@@ -322,7 +336,46 @@ func (rf *Raft) raiseElection() {
 	if count > len(rf.peers)/2 && rf.serverIdentity == ServerIdentityType_Candidate {
 		rf.mu.Lock()
 		rf.serverIdentity = ServerIdentityType_Leader
+		// rf.nextIndex
+		// rf.matchIndex
+		rf.mu.Unlock()
+		go rf.keepAuthority()
+	}
+}
 
+func (rf *Raft) keepAuthority() {
+	for {
+		if rf.killed() { return }
+		args := AppendEntriesArgs{}
+
+		rf.mu.Lock()
+		if rf.serverIdentity != ServerIdentityType_Leader { 
+			rf.mu.Unlock()
+			return 
+		}
+		args.LeaderId = rf.me
+		args.Term = rf.currentTerm
+		args.LeaderCommit = rf.commitIndex
+		// args.PrevLogIndex
+		// args.PrevLogTerm
+		// args.Entries
+		rf.mu.Unlock()
+
+		for i := 0; i < len(rf.peers); i++ {
+			if i == rf.me { continue }
+			go func (x int)  {
+				reply := AppendEntriesReply{}
+				ok := rf.sendAppendEntries(x, &args, &reply)
+				rf.mu.Lock()
+				if ok && reply.Term > rf.currentTerm {
+					rf.serverIdentity = ServerIdentityType_Follower
+					rf.currentTerm = reply.Term
+				}
+				rf.mu.Unlock()
+			}(i)
+		}
+
+		time.Sleep(100 * time.Millisecond)
 	}
 }
 
@@ -348,7 +401,7 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.currentTerm = 0
 	rf.votedFor = -1
 	rf.log = []interface{}{}
-	rf.commandIndex = 0
+	rf.commitIndex = 0
 	rf.lastApplied = 0
 	rf.recievedAppendEntries = false
 	
