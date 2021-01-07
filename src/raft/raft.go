@@ -177,8 +177,11 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 	rf.mu.Lock()
 	defer rf.mu.Unlock()
 	reply.Term = rf.currentTerm
-	if (rf.votedFor == -1 || rf.votedFor == args.CandidateId) && 
-		args.Term >= rf.currentTerm {
+	if (args.Term < rf.currentTerm) {
+		reply.VoteGranted = false
+		return
+	}
+	if rf.votedFor == -1 || rf.votedFor == args.CandidateId /* and up-to-date checking */ {
 		rf.votedFor = args.CandidateId
 		reply.VoteGranted = true
 	} else {
@@ -187,7 +190,19 @@ func (rf *Raft) RequestVote(args *RequestVoteArgs, reply *RequestVoteReply) {
 }
 
 func (rf *Raft) AppendEntries(args *AppendEntriesArgs, reply *AppendEntriesReply) {
-	
+	rf.mu.Lock()
+	if args.Term > rf.currentTerm { rf.currentTerm = args.Term}
+	if rf.serverIdentity == ServerIdentityType_Candidate {
+		rf.serverIdentity = ServerIdentityType_Follower
+		rf.recievedAppendEntries = true
+	} else if rf.serverIdentity == ServerIdentityType_Leader {	// This situation hardly happens
+		if rf.currentTerm <= args.Term {
+			rf.serverIdentity = ServerIdentityType_Follower
+		}
+	} else if rf.serverIdentity == ServerIdentityType_Follower {
+		rf.recievedAppendEntries = true
+	}
+	rf.mu.Unlock()
 }
 
 //
@@ -283,6 +298,7 @@ func (rf *Raft) kickOffElection() {
 		rf.mu.Lock()
 		identity := rf.serverIdentity
 		recieved := rf.recievedAppendEntries
+		if recieved { rf.recievedAppendEntries = false }
 		rf.mu.Unlock()
 		if !recieved && identity == ServerIdentityType_Follower {
 			go rf.raiseElection()
