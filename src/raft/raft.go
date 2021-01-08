@@ -169,7 +169,7 @@ type AppendEntriesArgs struct {
 
 type AppendEntriesReply	struct {
 	Term	int
-	success	bool
+	Success	bool
 }
 
 //
@@ -424,10 +424,12 @@ func Make(peers []*labrpc.ClientEnd, me int,
 	rf.commitIndex = 0
 	rf.lastApplied = 0
 	rf.recievedAppendEntries = false
+	rf.serverIdentity = ServerIdentityType_Follower
 	
 	// initialize from state persisted before a crash
 	rf.readPersist(persister.ReadRaftState())
 
+	go rf.kickOffElection()
 
 	return rf
 }
